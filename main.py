@@ -71,7 +71,10 @@ async def main():
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        from bot.utils.session_manager import disconnect_all
+        await disconnect_all()
         await api_runner.cleanup()
+        await bot.session.close()
 
 
 if __name__ == "__main__":
