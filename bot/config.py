@@ -14,6 +14,16 @@ API_HASH = os.getenv("API_HASH", "b18441a1ff607e10a989891a5462e627")
 SESSIONS_DIR = "sessions"
 API_PORT = int(os.getenv("API_PORT", "8080"))
 
+# Публичный URL API — задаётся вручную (Railway/VPS) или берётся из Replit
+_replit_domain = os.getenv("REPLIT_DEV_DOMAIN", "")
+_custom_url = os.getenv("API_BASE_URL", "")
+if _custom_url:
+    API_BASE_URL = _custom_url.rstrip("/")
+elif _replit_domain:
+    API_BASE_URL = f"https://{_replit_domain}/api/v1"
+else:
+    API_BASE_URL = f"http://localhost:{os.getenv('API_PORT', '8080')}/api/v1"
+
 USERNAME_CACHE_TTL = 3600
 
 FREE_DAILY_ATTEMPTS = 3

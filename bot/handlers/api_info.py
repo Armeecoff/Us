@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
 from bot.database import is_luxe, get_api_key, generate_api_key
-from bot.config import ADMIN_IDS, API_PORT
+from bot.config import ADMIN_IDS, API_PORT, API_BASE_URL
 
 router = Router()
 
@@ -21,10 +21,7 @@ async def menu_api_info(call: CallbackQuery):
     if not api_key and (luxe or is_admin):
         api_key = await generate_api_key(user_id)
 
-    # Get bot's domain from environment
-    import os
-    domain = os.getenv("REPLIT_DEV_DOMAIN", f"your-repl.replit.app")
-    base_url = f"https://{domain}/api/v1"
+    base_url = API_BASE_URL
 
     text = (
         "🌐 <b>UqozaSearch API — Luxe</b>\n"
