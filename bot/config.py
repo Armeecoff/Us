@@ -35,21 +35,21 @@ BULK_LUXE_PER_DAY = 100
 BULK_SIZE = 5
 
 DEFAULT_PREMIUM_PRICES = {
-    "1":  {"stars": 65,  "rub": 59},
-    "3":  {"stars": 150, "rub": 159},
-    "10": {"stars": 400, "rub": 399},
-    "30": {"stars": 800, "rub": 899},
+    "1":  {"stars": 65},
+    "3":  {"stars": 150},
+    "10": {"stars": 400},
+    "30": {"stars": 800},
 }
 
 DEFAULT_LUXE_PRICES = {
-    "1":  {"stars": 120, "rub": 119},
-    "3":  {"stars": 280, "rub": 279},
-    "10": {"stars": 700, "rub": 699},
-    "30": {"stars": 1500, "rub": 1499},
+    "1":  {"stars": 120},
+    "3":  {"stars": 280},
+    "10": {"stars": 700},
+    "30": {"stars": 1500},
 }
 
 DEFAULT_REFERRAL_REWARDS = {
     "7": 1, "14": 3, "25": 10, "50": 25,
 }
 
-DEFAULT_BULK_EXTRA_PRICE = {"stars": 50, "rub": 99}
+DEFAULT_BULK_EXTRA_PRICE = {"stars": 50}

@@ -54,12 +54,11 @@ async def do_bulk(call: CallbackQuery, length: int, with_digits: bool):
     if remaining <= 0:
         price_data = await get_setting("bulk_extra_price")
         stars = price_data.get("stars", 50) if price_data else 50
-        rub = price_data.get("rub", 99) if price_data else 99
         await call.message.edit_text(
             f"⛔ <b>Лимит массового поиска исчерпан!</b>\n\n"
             f"Использовано: {used}/{limit} сегодня\n\n"
             f"Докупите дополнительные попытки:",
-            reply_markup=bulk_buy_extra_kb(stars, rub),
+            reply_markup=bulk_buy_extra_kb(stars),
             parse_mode="HTML"
         )
         await call.answer()

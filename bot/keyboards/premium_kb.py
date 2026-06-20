@@ -17,7 +17,7 @@ def sub_prices_kb(prices: dict, sub_type: str) -> InlineKeyboardMarkup:
             p = prices[days]
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"⭐ {label} — {p['stars']} Stars / {p['rub']}₽",
+                    text=f"⭐ {label} — {p['stars']} Stars",
                     callback_data=f"buy_{sub_type}_{days}"
                 )
             ])

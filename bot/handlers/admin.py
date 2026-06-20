@@ -1,5 +1,6 @@
+import os
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -22,7 +23,6 @@ router = Router()
 
 class AdminStates(StatesGroup):
     edit_price_stars = State()
-    edit_price_rub = State()
     edit_ref_days = State()
     create_promo_code = State()
     create_promo_days = State()
@@ -33,7 +33,6 @@ class AdminStates(StatesGroup):
     give_premium_days = State()
     revoke_sub_user = State()
     bulk_price_stars = State()
-    bulk_price_rub = State()
     add_session_phone = State()
     add_session_code = State()
     add_session_pass = State()
@@ -97,6 +96,22 @@ async def admin_panel(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 
+@router.message(Command("db"))
+async def cmd_db(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+    from bot.config import DB_PATH
+    if not os.path.exists(DB_PATH):
+        await message.answer("❌ Файл базы данных не найден.")
+        return
+    size_kb = os.path.getsize(DB_PATH) // 1024
+    await message.answer_document(
+        FSInputFile(DB_PATH, filename="bot_data.db"),
+        caption=f"🗄 <b>База данных</b>\n📦 Размер: {size_kb} КБ",
+        parse_mode="HTML"
+    )
+
+
 # ─── Prices ───────────────────────────────────────────────────────────────
 
 @router.callback_query(F.data == "admin_prices")
@@ -131,7 +146,7 @@ async def admin_edit_price_start(call: CallbackQuery, state: FSMContext):
     labels = {"1": "1 день", "3": "3 дня", "10": "10 дней", "30": "30 дней"}
     await call.message.edit_text(
         f"✏️ <b>{labels.get(days)}</b> ({sub_type})\n"
-        f"Текущая: {cur.get('stars','?')}⭐ / {cur.get('rub','?')}₽\n\n"
+        f"Текущая: {cur.get('stars','?')}⭐\n\n"
         "Введите новую цену в Stars:",
         reply_markup=cancel_admin_kb(), parse_mode="HTML"
     )
@@ -147,26 +162,13 @@ async def admin_edit_stars(message: Message, state: FSMContext):
         assert stars > 0
     except Exception:
         await message.answer("❌ Введите число Stars > 0:", reply_markup=cancel_admin_kb()); return
-    await state.update_data(new_stars=stars)
-    await message.answer("Теперь введите цену в рублях ₽:", reply_markup=cancel_admin_kb())
-    await state.set_state(AdminStates.edit_price_rub)
-
-
-@router.message(AdminStates.edit_price_rub)
-async def admin_edit_rub(message: Message, state: FSMContext):
-    if not is_admin(message.from_user.id): return
-    try:
-        rub = int(message.text.strip())
-        assert rub > 0
-    except Exception:
-        await message.answer("❌ Введите число ₽ > 0:", reply_markup=cancel_admin_kb()); return
     data = await state.get_data()
     prices = await get_setting(data["editing_key"])
-    prices[data["editing_days"]] = {"stars": data["new_stars"], "rub": rub}
+    prices[data["editing_days"]] = {"stars": stars}
     await set_setting(data["editing_key"], prices)
     await state.clear()
     await message.answer(
-        f"✅ Цена обновлена: {data['new_stars']}⭐ / {rub}₽",
+        f"✅ Цена обновлена: {stars}⭐",
         reply_markup=admin_prices_kb(prices, "admin_edit_price" if "premium" in data["editing_key"] else "admin_edit_luxe"),
         parse_mode="HTML"
     )
@@ -181,7 +183,7 @@ async def admin_bulk_price(call: CallbackQuery, state: FSMContext):
     cur = await get_setting("bulk_extra_price") or {}
     await call.message.edit_text(
         f"📦 <b>Цена доп. попыток массового поиска</b>\n\n"
-        f"Текущая: {cur.get('stars','?')}⭐ / {cur.get('rub','?')}₽ за 5 попыток\n\n"
+        f"Текущая: {cur.get('stars','?')}⭐ за 5 попыток\n\n"
         "Введите новую цену в Stars:",
         reply_markup=cancel_admin_kb(), parse_mode="HTML"
     )
@@ -197,22 +199,9 @@ async def admin_bulk_stars(message: Message, state: FSMContext):
         stars = int(message.text.strip()); assert stars > 0
     except Exception:
         await message.answer("❌ Введите число > 0:", reply_markup=cancel_admin_kb()); return
-    await state.update_data(new_stars=stars)
-    await message.answer("Введите цену в рублях ₽:", reply_markup=cancel_admin_kb())
-    await state.set_state(AdminStates.bulk_price_rub)
-
-
-@router.message(AdminStates.bulk_price_rub)
-async def admin_bulk_rub(message: Message, state: FSMContext):
-    if not is_admin(message.from_user.id): return
-    try:
-        rub = int(message.text.strip()); assert rub > 0
-    except Exception:
-        await message.answer("❌ Введите число > 0:", reply_markup=cancel_admin_kb()); return
-    data = await state.get_data()
-    await set_setting("bulk_extra_price", {"stars": data["new_stars"], "rub": rub})
+    await set_setting("bulk_extra_price", {"stars": stars})
     await state.clear()
-    await message.answer(f"✅ Цена обновлена: {data['new_stars']}⭐ / {rub}₽ за 5 попыток", reply_markup=admin_back_kb())
+    await message.answer(f"✅ Цена обновлена: {stars}⭐ за 5 попыток", reply_markup=admin_back_kb())
 
 
 # ─── Referrals ────────────────────────────────────────────────────────────

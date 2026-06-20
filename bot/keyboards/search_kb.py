@@ -63,10 +63,10 @@ def bulk_options_kb() -> InlineKeyboardMarkup:
     ])
 
 
-def bulk_buy_extra_kb(stars: int, rub: int) -> InlineKeyboardMarkup:
+def bulk_buy_extra_kb(stars: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=f"⭐ Докупить 5 попыток — {stars} Stars / {rub}₽",
+            text=f"⭐ Докупить 5 попыток — {stars} Stars",
             callback_data="bulk_buy_extra"
         )],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="menu_search")],

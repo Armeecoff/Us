@@ -25,7 +25,7 @@ def admin_prices_kb(prices: dict, prefix: str = "admin_edit_price") -> InlineKey
         if days in prices:
             p = prices[days]
             buttons.append([InlineKeyboardButton(
-                text=f"✏️ {label}: {p['stars']}⭐ / {p['rub']}₽",
+                text=f"✏️ {label}: {p['stars']}⭐",
                 callback_data=f"{prefix}_{days}"
             )])
     buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel")])
