@@ -15,12 +15,10 @@ API_HASH = os.getenv("API_HASH", "b18441a1ff607e10a989891a5462e627")
 SESSIONS_DIR = "sessions"
 
 # ------------------- Настройки для деплоя (Railway / VPS) -------------------
-# Хост и порт для веб-сервера (обязательно 0.0.0.0 и порт из окружения)
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", os.getenv("API_PORT", "8080")))  # приоритет у PORT (Railway)
+PORT = int(os.getenv("PORT", os.getenv("API_PORT", "8080")))
 
 # ------------------- API URL (публичный эндпоинт) -------------------
-# Приоритет: явный API_BASE_URL → Railway → Replit → localhost
 _custom_url = os.getenv("API_BASE_URL", "")
 _railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
 _replit_domain = os.getenv("REPLIT_DEV_DOMAIN", "")
@@ -35,21 +33,20 @@ else:
     API_BASE_URL = f"http://{HOST}:{PORT}/api/v1"
 
 # ------------------- Кеширование -------------------
-USERNAME_CACHE_TTL = 3600  # секунд
+USERNAME_CACHE_TTL = 3600
 
 # ------------------- Лимиты на проверки -------------------
-FREE_DAILY_ATTEMPTS = 4
+FREE_DAILY_ATTEMPTS = 3
 PREMIUM_DAILY_ATTEMPTS = 999999
 LUXE_DAILY_ATTEMPTS = 999999
 
-# ✅ Изменено: Premium теперь может делать 15 мульти-запросов в день (было 10)
-BULK_PREMIUM_PER_DAY = 15
+BULK_PREMIUM_PER_DAY = 15   # ✅ изменено с 10 на 15
 BULK_LUXE_PER_DAY = 100
 BULK_SIZE = 5
 
 # ------------------- Мультипоточность (пул сессий) -------------------
-# Максимальное количество одновременных клиентов (сессий) для параллельной проверки
 MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", 10))
+MAX_CONCURRENT_CHECKS = int(os.getenv("MAX_CONCURRENT_CHECKS", 15))   # <--- ДОБАВЛЕНО
 
 # ------------------- Цены на подписки (в Stars) -------------------
 DEFAULT_PREMIUM_PRICES = {
