@@ -5,13 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, BaseMiddleware
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.config import BOT_TOKEN, API_ID, API_HASH, SESSIONS_DIR, PORT
-from bot.database import init_db
+from bot.database import init_db, get_user, create_user
 from bot.handlers import start, search, premium, profile, referrals, admin
 from bot.handlers import bulk_search, history, api_info
 from bot.utils.scheduler import trap_scheduler
@@ -27,6 +27,24 @@ logging.getLogger("telethon").setLevel(logging.WARNING)
 logging.getLogger("aiohttp").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+
+
+class EnsureUserMiddleware(BaseMiddleware):
+    """
+    Гарантирует, что для любого входящего апдейта у пользователя есть
+    строка в таблице users, ДО того как апдейт дойдёт до хендлеров.
+    Раньше запись создавалась только в /start, из-за чего increment_search
+    и другие функции падали с 'NoneType' object is not subscriptable,
+    если пользователь писал боту без /start (или таблица users
+    обнулялась при редеплое на Railway из-за отсутствия volume).
+    """
+    async def __call__(self, handler, event, data):
+        user = getattr(event, "from_user", None)
+        if user is not None and not user.is_bot:
+            existing = await get_user(user.id)
+            if existing is None:
+                await create_user(user.id, user.username)
+        return await handler(event, data)
 
 
 async def main():
@@ -49,6 +67,7 @@ async def main():
     set_bot(bot)
 
     dp = Dispatcher(storage=MemoryStorage())
+    dp.update.outer_middleware(EnsureUserMiddleware())
     dp.include_router(start.router)
     dp.include_router(search.router)
     dp.include_router(premium.router)

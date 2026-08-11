@@ -229,17 +229,19 @@ async def get_today_searches(user_id: int) -> int:
 async def increment_search(user_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         today = date.today().isoformat()
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT last_search_date, today_searches FROM users WHERE user_id=?", (user_id,)
-        ) as cur:
-            row = await cur.fetchone()
-        today_count = 1 if row["last_search_date"] != today else (row["today_searches"] or 0) + 1
+        # Атомарный upsert: работает и если строки пользователя ещё нет
+        # (например, users была обнулена при редеплое или юзер не проходил /start)
         await db.execute("""
-            UPDATE users SET total_searches=total_searches+1,
-                today_searches=?, last_search_date=?
-            WHERE user_id=?
-        """, (today_count, today, user_id))
+            INSERT INTO users (user_id, total_searches, today_searches, last_search_date)
+            VALUES (?, 1, 1, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                total_searches = total_searches + 1,
+                today_searches = CASE
+                    WHEN last_search_date = ? THEN today_searches + 1
+                    ELSE 1
+                END,
+                last_search_date = ?
+        """, (user_id, today, today, today))
         await db.commit()
 
 
