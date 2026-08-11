@@ -4,7 +4,8 @@ from aiogram.types import CallbackQuery
 
 from bot.database import (
     is_premium, is_luxe, get_bulk_used_today, get_bulk_extra,
-    increment_bulk, increment_found, save_found_username, get_setting
+    increment_bulk, increment_found, save_found_username, get_setting,
+    update_user_stats, get_user_stats   # новые импорты
 )
 from bot.config import BULK_PREMIUM_PER_DAY, BULK_LUXE_PER_DAY, BULK_SIZE
 from bot.keyboards.search_kb import (
@@ -73,21 +74,35 @@ async def do_bulk(call: CallbackQuery, length: int, with_digits: bool):
     )
     await call.answer()
 
+    # Увеличиваем счётчик использованных массовых поисков
     await increment_bulk(user_id)
     if extra > 0 and (await get_bulk_used_today(user_id)) > limit:
         from bot.database import spend_bulk_extra
         await spend_bulk_extra(user_id)
 
+    # Запускаем поиск
     results = await find_free_usernames(
         length, with_digits, count=BULK_SIZE, max_attempts=1000
     )
 
     prem = await is_premium(user_id)
-    if results:
-        for uname, rating in results:
-            await increment_found(user_id)
-            await save_found_username(user_id, uname, length, rating)
 
+    # Обновляем статистику для каждого найденного ника
+    for uname, rating in results:
+        await increment_found(user_id)
+        await save_found_username(user_id, uname, length, rating)
+        # Обновляем расширенную статистику (total_searches, avg_rating и т.д.)
+        await update_user_stats(user_id, searched=1, found=1, rating=rating)
+
+    # Если ников не найдено, всё равно увеличим счётчик поисков (хотя бы на 1)
+    if not results:
+        # Можно засчитать как одну проверку без находки
+        await update_user_stats(user_id, searched=1, found=0)
+
+    # Получаем обновлённую статистику пользователя
+    stats = await get_user_stats(user_id)
+
+    if results:
         lines = []
         for i, (uname, rating) in enumerate(results, 1):
             stars_str = "⭐" * rating + "☆" * (10 - rating)
@@ -102,16 +117,38 @@ async def do_bulk(call: CallbackQuery, length: int, with_digits: bool):
         new_remaining = max(0, new_limit - new_used) + new_extra
 
         result_text = "\n\n".join(lines)
+
+        # Добавляем блок статистики
+        stats_text = (
+            f"\n\n📊 <b>Ваша статистика</b>\n"
+            f"• Всего поисков: {stats['total_searches']}\n"
+            f"• Найдено ников: {stats['total_found']}\n"
+            f"• Сегодня: {stats['today_searches']} проверок, {stats['today_found']} найдено\n"
+            f"• Средний рейтинг: {stats['avg_rating']:.1f}"
+        )
+
         await call.message.edit_text(
             f"✅ <b>Найдено {len(results)} свободных ника!</b>\n\n"
             f"{result_text}\n\n"
-            f"🎯 Осталось запусков: {new_remaining}",
+            f"🎯 Осталось запусков: {new_remaining}"
+            f"{stats_text}",
             reply_markup=search_sections_kb(prem),
             parse_mode="HTML"
         )
     else:
+        # Если ничего не найдено, показываем статистику
+        stats_text = (
+            f"\n\n📊 <b>Ваша статистика</b>\n"
+            f"• Всего поисков: {stats['total_searches']}\n"
+            f"• Найдено ников: {stats['total_found']}\n"
+            f"• Сегодня: {stats['today_searches']} проверок, {stats['today_found']} найдено\n"
+            f"• Средний рейтинг: {stats['avg_rating']:.1f}"
+        )
+
         await call.message.edit_text(
-            "❌ <b>Не удалось найти ники</b>\n\nПопробуйте ещё раз.",
+            f"❌ <b>Не удалось найти ники</b>\n\n"
+            f"Попробуйте ещё раз."
+            f"{stats_text}",
             reply_markup=search_sections_kb(prem),
             parse_mode="HTML"
         )
