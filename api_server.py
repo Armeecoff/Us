@@ -25,8 +25,9 @@ from bot.database import (
     update_user_stats,
     save_found_username,
     get_user,
+    is_luxe,
 )
-from bot.utils.username_checker import find_free_usernames, find_free_username, apply_mask
+from bot.utils.username_checker import find_free_usernames, find_free_username, apply_mask, is_username_free
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,6 @@ async def authorize(request) -> tuple[dict, web.Response | None]:
             status=401
         )
     # Проверяем подписку (Luxe должна быть активна)
-    from bot.database import is_luxe
     if not await is_luxe(user["user_id"]):
         return None, web.json_response(
             {"ok": False, "error": "Luxe subscription expired or not active"},
@@ -82,7 +82,7 @@ async def api_search(request):
         length = int(request.query.get("length", 6))
         digits = request.query.get("digits", "false").lower() == "true"
         rating = int(request.query.get("rating", 1))
-        count = min(int(request.query.get("count", 1)), 5)  # максимум 5
+        count = min(int(request.query.get("count", 1)), 5)
     except ValueError:
         return web.json_response({"ok": False, "error": "Invalid parameters"}, status=400)
 
@@ -131,19 +131,15 @@ async def api_search_mask(request):
     if not mask:
         return web.json_response({"ok": False, "error": "mask parameter required"}, status=400)
 
-    # Проверка маски (можно добавить validate_mask)
     if len(mask) < 5 or len(mask) > 32:
         return web.json_response({"ok": False, "error": "mask length must be 5-32"}, status=400)
 
-    # Генерируем один ник по маске
     uname = apply_mask(mask)
     rating = 7  # можно вычислить rate_username, но для простоты ставим 7
-    # Проверяем, свободен ли
-    from bot.utils.username_checker import is_username_free
     free = await is_username_free(uname)
     results = []
     if free:
-        results.append({"username": uname, "rating": rating, "length": len(uname), "link": f"t.me/{uname"})
+        results.append({"username": uname, "rating": rating, "length": len(uname), "link": f"t.me/{uname}"})
         await update_user_stats(user["user_id"], searched=1, found=1, rating=rating)
         await save_found_username(user["user_id"], uname, len(uname), rating)
     else:
@@ -223,7 +219,6 @@ async def api_delete_trap(request):
     if not username:
         return web.json_response({"ok": False, "error": "username required"}, status=400)
 
-    # Проверяем, что ловушка принадлежит этому пользователю
     traps = await get_user_traps(user["user_id"])
     for t in traps:
         if t["target_username"].lower() == username.lower():
