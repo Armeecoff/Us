@@ -34,6 +34,7 @@ async def init_db():
             ("api_key", "TEXT"),
             ("avg_rating", "REAL DEFAULT 0.0"),          # новая
             ("last_active", "TEXT"),                     # новая
+            ("today_found", "INTEGER DEFAULT 0"),        # используется в update_user_stats, забыли добавить
         ]
         for col, col_type in cols_to_add:
             try:
