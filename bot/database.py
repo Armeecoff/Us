@@ -25,12 +25,15 @@ async def init_db():
                 registered_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Добавляем новые колонки для улучшенной статистики
         cols_to_add = [
             ("luxe_until", "TEXT"),
             ("bulk_today", "INTEGER DEFAULT 0"),
             ("bulk_date", "TEXT"),
             ("bulk_extra", "INTEGER DEFAULT 0"),
             ("api_key", "TEXT"),
+            ("avg_rating", "REAL DEFAULT 0.0"),          # новая
+            ("last_active", "TEXT"),                     # новая
         ]
         for col, col_type in cols_to_add:
             try:
@@ -534,3 +537,107 @@ async def find_user_by_identifier(identifier: str):
                 "SELECT * FROM users WHERE username=?", (identifier,)
             ) as cur:
                 return await cur.fetchone()
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  НОВЫЕ ФУНКЦИИ ДЛЯ УЛУЧШЕННОЙ СТАТИСТИКИ
+# ════════════════════════════════════════════════════════════════════════════════
+
+async def update_user_stats(user_id: int, searched: int = 1, found: int = 0, rating: float = 0.0):
+    """
+    Обновляет статистику пользователя после каждой проверки.
+    - searched: количество проверенных юзернеймов (обычно 1)
+    - found: количество найденных свободных (0 или 1)
+    - rating: рейтинг найденного ника (если found=1)
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        now = datetime.now().isoformat()
+        today = date.today().isoformat()
+
+        # Проверяем, нужно ли обнулить today_searches
+        await db.execute("""
+            UPDATE users 
+            SET today_searches = 0, today_found = 0, bulk_today = 0
+            WHERE user_id = ? AND (last_search_date IS NULL OR last_search_date < ?)
+        """, (user_id, today))
+
+        # Обновляем основные счётчики
+        # Если found=1, то увеличиваем found_count и обновляем avg_rating
+        if found > 0:
+            await db.execute("""
+                INSERT INTO users (user_id, total_searches, found_count, today_searches, today_found, avg_rating, last_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    total_searches = total_searches + excluded.total_searches,
+                    found_count = found_count + excluded.found_count,
+                    today_searches = today_searches + excluded.today_searches,
+                    today_found = CASE 
+                        WHEN last_search_date = ? THEN today_found + 1 
+                        ELSE 1 
+                    END,
+                    avg_rating = CASE 
+                        WHEN found_count = 0 THEN ? 
+                        ELSE (avg_rating * found_count + ?) / (found_count + 1) 
+                    END,
+                    last_active = excluded.last_active,
+                    last_search_date = ?
+            """, (user_id, searched, found, searched, rating, today, rating, rating, today))
+        else:
+            # только поиск без находки
+            await db.execute("""
+                INSERT INTO users (user_id, total_searches, today_searches, last_active, last_search_date)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    total_searches = total_searches + excluded.total_searches,
+                    today_searches = CASE 
+                        WHEN last_search_date = ? THEN today_searches + 1 
+                        ELSE 1 
+                    END,
+                    last_active = excluded.last_active,
+                    last_search_date = excluded.last_search_date
+            """, (user_id, searched, searched, now, today, today))
+
+        await db.commit()
+
+
+async def get_user_stats(user_id: int) -> dict:
+    """
+    Возвращает словарь со всей статистикой пользователя:
+        - premium_until, luxe_until, referrals
+        - total_searches, total_found, today_searches, today_found
+        - avg_rating, last_active
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT premium_until, luxe_until, referral_count, 
+                   total_searches, found_count, 
+                   today_searches, 
+                   COALESCE((SELECT SUM(found_count) FROM users WHERE user_id = ? AND last_search_date = date('now')), 0) AS today_found,
+                   avg_rating, last_active
+            FROM users WHERE user_id = ?
+        """, (user_id, user_id)) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return {
+                "premium_until": None,
+                "luxe_until": None,
+                "referrals": 0,
+                "total_searches": 0,
+                "total_found": 0,
+                "today_searches": 0,
+                "today_found": 0,
+                "avg_rating": 0.0,
+                "last_active": None
+            }
+        return {
+            "premium_until": row["premium_until"],
+            "luxe_until": row["luxe_until"],
+            "referrals": row["referral_count"] or 0,
+            "total_searches": row["total_searches"] or 0,
+            "total_found": row["found_count"] or 0,
+            "today_searches": row["today_searches"] or 0,
+            "today_found": row["today_found"] or 0,
+            "avg_rating": row["avg_rating"] or 0.0,
+            "last_active": row["last_active"]
+        }
