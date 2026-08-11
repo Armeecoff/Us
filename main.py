@@ -10,7 +10,7 @@ from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from bot.config import BOT_TOKEN, API_ID, API_HASH, SESSIONS_DIR, HOST, PORT
+from bot.config import BOT_TOKEN, API_ID, API_HASH, SESSIONS_DIR, PORT
 from bot.database import init_db
 from bot.handlers import start, search, premium, profile, referrals, admin
 from bot.handlers import bulk_search, history, api_info
@@ -37,7 +37,6 @@ async def main():
     await init_db()
     logger.info("База данных инициализирована")
 
-    # Загружаем существующие .session файлы из папки sessions/
     await load_sessions(API_ID, API_HASH, SESSIONS_DIR)
     logger.info("Сессии загружены")
 
@@ -64,8 +63,9 @@ async def main():
     logger.info(f"Бот запущен: @{me.username}")
 
     from api_server import start_api_server
-    api_runner = await start_api_server(host=HOST, port=PORT)
-    logger.info(f"API сервер: http://{HOST}:{PORT}/api/v1/status")
+    # Передаём только порт (как было в оригинале)
+    api_runner = await start_api_server(PORT)
+    logger.info(f"API сервер запущен на порту {PORT}")
 
     asyncio.create_task(trap_scheduler(bot, interval=60))
 
